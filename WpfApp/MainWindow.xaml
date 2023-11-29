@@ -7,8 +7,11 @@
         mc:Ignorable="d"
         Title="{Binding Fps, Mode=OneWay}" Height="450" Width="800"
         d:DataContext="{d:DesignInstance local:MainViewModel}">
-    <Image
-        Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter}}"
-        HorizontalAlignment="Stretch"
-        VerticalAlignment="Stretch"/>
+    <Border
+        Background="Red">
+        <Image
+            Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 50}}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"/>
+    </Border>
 </Window>

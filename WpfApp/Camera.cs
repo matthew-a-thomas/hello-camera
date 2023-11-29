@@ -29,7 +29,7 @@ public static class Camera
                     var frameSize = mediaType.Get<ulong>(MediaTypeAttributeKeys.FrameSize);
                     var height = (int)(frameSize & ~0U);
                     var width = (int)(frameSize >> 32);
-                    var (videoSubtype, fourCc) = (VideoFormatGuids.Rgb24, 0x00000014);
+                    var (videoSubtype, fourCc, bitsPerPixel) = (VideoFormatGuids.Argb32, 0x00000015, 32);
                     using var destSample = MediaFactory.MFCreateSample();
                     using var destBuffer = MediaFactory.MFCreate2DMediaBuffer(
                         width,
@@ -81,7 +81,7 @@ public static class Camera
                                 destBuffer2d.ContiguousCopyTo(array, length);
                                 using var frameAvailableEvent = new FrameAvailableEvent(
                                     array,
-                                    24,
+                                    bitsPerPixel,
                                     pitch,
                                     new TimeSpan(timestampTicks),
                                     () => blobCache.Return(array)

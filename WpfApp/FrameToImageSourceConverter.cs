@@ -9,33 +9,43 @@ namespace WpfApp;
 
 [MarkupExtensionReturnType(typeof(FrameToImageSourceConverter))]
 [ValueConversion(typeof(FrameAvailableEvent), typeof(ImageSource))]
-public sealed class FrameToImageSourceConverter : MarkupExtension, IValueConverter
+public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtension, IValueConverter
 {
     (int BufferLength, int Stride, WriteableBitmap WriteableBitmap)? _cache;
+    MedianShader? _medianShader;
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not FrameAvailableEvent frameAvailableEvent)
+        {
+            _cache = null;
+            _medianShader?.Dispose();
+            _medianShader = null;
             return DependencyProperty.UnsetValue;
+        }
         using var _ = frameAvailableEvent;
         frameAvailableEvent.Increment();
         var stride = frameAvailableEvent.Stride;
-        if (_cache is not {} cache || cache.BufferLength != frameAvailableEvent.Memory.Length || cache.Stride != stride)
+        if (_cache is not {} cache || _medianShader is not {} medianShader || cache.BufferLength != frameAvailableEvent.Memory.Length || cache.Stride != stride)
         {
+            var pixelWidth = stride / 4;
+            var pixelHeight = frameAvailableEvent.Memory.Length / stride;
             _cache = cache = (
                 frameAvailableEvent.Memory.Length,
                 stride,
                 new WriteableBitmap(
-                    stride / 3,
-                    frameAvailableEvent.Memory.Length / stride,
+                    pixelWidth,
+                    pixelHeight,
                     96.0,
                     96.0,
-                    PixelFormats.Bgr24,
+                    PixelFormats.Bgra32,
                     null
                 )
             );
+            _medianShader?.Dispose();
+            _medianShader = medianShader = new MedianShader(medianFactor, pixelWidth, pixelHeight);
         }
         var writeableBitmap = cache.WriteableBitmap;
         writeableBitmap.Lock();
@@ -43,15 +53,25 @@ public sealed class FrameToImageSourceConverter : MarkupExtension, IValueConvert
         {
             unsafe
             {
-                fixed (byte* pointer = frameAvailableEvent.Memory.Span)
-                {
-                    writeableBitmap.WritePixels(
-                        new Int32Rect(0, 0, writeableBitmap.PixelWidth, writeableBitmap.PixelHeight),
-                        (IntPtr)pointer,
-                        frameAvailableEvent.Memory.Length,
-                        stride
-                    );
-                }
+                var backBuffer = new Span<byte>(
+                    (void*)writeableBitmap.BackBuffer,
+                    writeableBitmap.BackBufferStride * writeableBitmap.PixelHeight
+                );
+                medianShader.Incorporate(
+                    frameAvailableEvent.Memory.Span,
+                    backBuffer
+                );
+                var dirtyRect = new Int32Rect(0, 0, writeableBitmap.PixelWidth, writeableBitmap.PixelHeight);
+                writeableBitmap.AddDirtyRect(dirtyRect);
+                // fixed (byte* pointer = frameAvailableEvent.Memory.Span)
+                // {
+                //     writeableBitmap.WritePixels(
+                //         dirtyRect,
+                //         (IntPtr)pointer,
+                //         frameAvailableEvent.Memory.Length,
+                //         stride
+                //     );
+                // }
             }
         }
         finally
