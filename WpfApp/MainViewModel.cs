@@ -13,11 +13,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         Camera
             .GetFrames(0)
-            .Select(x => (Frame?)x)
+            .Select(x => (FrameAvailableEvent?)x)
             .Materialize()
             .SelectMany(notification => notification.Kind == NotificationKind.OnNext
                 ? Observable.Return(notification)
-                : Observable.Return(Notification.CreateOnNext<Frame?>(null)).Append(notification))
+                : Observable.Return(Notification.CreateOnNext<FrameAvailableEvent?>(null)).Append(notification))
             .Dematerialize()
             .RetryWhen(e => e.Delay(TimeSpan.FromSeconds(1)))
             .Subscribe(frame => Frame = frame);
@@ -36,8 +36,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    Frame? _frame;
-    public Frame? Frame
+    FrameAvailableEvent? _frame;
+    public FrameAvailableEvent? Frame
     {
         get => _frame;
         private set
@@ -53,7 +53,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 var elapsed = value.Timestamp - _frame.Timestamp;
                 Fps = $"{1.0 / elapsed.TotalSeconds:N1}";
             }
-            _frame = value;
+            value?.Increment();
+            Interlocked.Exchange(ref _frame, value)?.Dispose();
             RaisePropertyChanged();
         }
     }

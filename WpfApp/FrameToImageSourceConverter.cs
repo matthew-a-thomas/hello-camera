@@ -8,7 +8,7 @@ using System.Windows.Media.Imaging;
 namespace WpfApp;
 
 [MarkupExtensionReturnType(typeof(FrameToImageSourceConverter))]
-[ValueConversion(typeof(Frame), typeof(ImageSource))]
+[ValueConversion(typeof(FrameAvailableEvent), typeof(ImageSource))]
 public sealed class FrameToImageSourceConverter : MarkupExtension, IValueConverter
 {
     (int BufferLength, int Stride, WriteableBitmap WriteableBitmap)? _cache;
@@ -17,17 +17,19 @@ public sealed class FrameToImageSourceConverter : MarkupExtension, IValueConvert
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is not Frame frame)
+        if (value is not FrameAvailableEvent frameAvailableEvent)
             return DependencyProperty.UnsetValue;
-        var stride = frame.Stride;
-        if (_cache is not {} cache || cache.BufferLength != frame.Buffer.Length || cache.Stride != stride)
+        using var _ = frameAvailableEvent;
+        frameAvailableEvent.Increment();
+        var stride = frameAvailableEvent.Stride;
+        if (_cache is not {} cache || cache.BufferLength != frameAvailableEvent.Memory.Length || cache.Stride != stride)
         {
             _cache = cache = (
-                frame.Buffer.Length,
+                frameAvailableEvent.Memory.Length,
                 stride,
                 new WriteableBitmap(
                     stride / 3,
-                    frame.Buffer.Length / stride,
+                    frameAvailableEvent.Memory.Length / stride,
                     96.0,
                     96.0,
                     PixelFormats.Bgr24,
@@ -41,12 +43,12 @@ public sealed class FrameToImageSourceConverter : MarkupExtension, IValueConvert
         {
             unsafe
             {
-                fixed (byte* pointer = frame.Buffer.Span)
+                fixed (byte* pointer = frameAvailableEvent.Memory.Span)
                 {
                     writeableBitmap.WritePixels(
                         new Int32Rect(0, 0, writeableBitmap.PixelWidth, writeableBitmap.PixelHeight),
                         (IntPtr)pointer,
-                        frame.Buffer.Length,
+                        frameAvailableEvent.Memory.Length,
                         stride
                     );
                 }

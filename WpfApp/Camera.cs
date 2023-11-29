@@ -6,9 +6,10 @@ namespace WpfApp;
 
 public static class Camera
 {
-    public static IObservable<Frame> GetFrames(int deviceIndex) => Observable.Create<Frame>(observer =>
+    public static IObservable<FrameAvailableEvent> GetFrames(int deviceIndex) => Observable.Create<FrameAvailableEvent>(observer =>
     {
         var disposeFlag = new DisposeFlag();
+        var blobCache = new BlobCache<byte>();
         Task.Factory.StartNew(
             () =>
             {
@@ -72,23 +73,25 @@ public static class Camera
                                 ref outputSample,
                                 out _).CheckError();
 
-                            var localCopy = new byte[destBuffer2d.ContiguousLength];
                             destBuffer2d.Lock2D(out _, out var pitch);
                             try
                             {
-                                destBuffer2d.ContiguousCopyTo(localCopy, localCopy.Length);
+                                var length = destBuffer2d.ContiguousLength;
+                                var array = blobCache.Get(length);
+                                destBuffer2d.ContiguousCopyTo(array, length);
+                                using var frameAvailableEvent = new FrameAvailableEvent(
+                                    array,
+                                    24,
+                                    pitch,
+                                    new TimeSpan(timestampTicks),
+                                    () => blobCache.Return(array)
+                                );
+                                observer.OnNext(frameAvailableEvent);
                             }
                             finally
                             {
                                 destBuffer2d.Unlock2D();
                             }
-
-                            var frame = new Frame(
-                                localCopy,
-                                pitch,
-                                new TimeSpan(timestampTicks)
-                            );
-                            observer.OnNext(frame);
                         }
                     }
                     finally
