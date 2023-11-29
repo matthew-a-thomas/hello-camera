@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
 
 namespace WpfApp;
 
@@ -22,6 +23,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
             .Subscribe(frame => Frame = frame);
     }
 
+    string? _fps;
+    public string? Fps
+    {
+        get => _fps;
+        private set
+        {
+            if (_fps == value)
+                return;
+            _fps = value;
+            RaisePropertyChanged();
+        }
+    }
+
     Frame? _frame;
     public Frame? Frame
     {
@@ -30,8 +44,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (_frame == value)
                 return;
+            if (value is null || _frame is null)
+            {
+                Fps = null;
+            }
+            else
+            {
+                var elapsed = value.Timestamp - _frame.Timestamp;
+                Fps = $"{1.0 / elapsed.TotalSeconds:N1}";
+            }
             _frame = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Frame)));
+            RaisePropertyChanged();
         }
+    }
+
+    void RaisePropertyChanged([CallerMemberName] string name = "")
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }
