@@ -4,9 +4,18 @@ using Vortice.MediaFoundation;
 
 namespace WpfApp;
 
+public struct CameraOptions
+{
+    public int DeviceIndex;
+    public bool FlipX;
+    public bool FlipY;
+}
+
 public static class Camera
 {
-    public static IObservable<FrameAvailableEvent> GetFrames(int deviceIndex) => Observable.Create<FrameAvailableEvent>(observer =>
+    public static IObservable<FrameAvailableEvent> GetFrames(
+        CameraOptions options
+    ) => Observable.Create<FrameAvailableEvent>(observer =>
     {
         var disposeFlag = new DisposeFlag();
         var blobCache = new BlobCache<byte>();
@@ -17,7 +26,7 @@ public static class Camera
                 MediaFactory.MFStartup(true).CheckError();
                 try
                 {
-                    using var mediaSource = GetMediaSource(deviceIndex);
+                    using var mediaSource = GetMediaSource(options.DeviceIndex);
                     if (mediaSource is null)
                         throw new Exception("Cannot find a device with that index");
                     using var sourceReader = MediaFactory.MFCreateSourceReaderFromMediaSource(mediaSource, null);
@@ -38,9 +47,10 @@ public static class Camera
                         false);
                     destSample.AddBuffer(destBuffer);
                     using var destBuffer2d = destBuffer.QueryInterface<IMF2DBuffer>();
-                    using var transform = Camera.GetTransform(
+                    using var transform = GetTransform(
                         mediaType,
-                        videoSubtype
+                        videoSubtype,
+                        options
                     ) ?? throw new Exception("Unable to transform the video stream");
                     transform.ProcessMessage(TMessageType.MessageNotifyBeginStreaming, default);
                     transform.ProcessMessage(TMessageType.MessageNotifyStartOfStream, default);
@@ -123,7 +133,8 @@ public static class Camera
 
     static unsafe IMFTransform? GetTransform(
         IMFMediaType fromType,
-        Guid toVideoSubtype)
+        Guid toVideoSubtype,
+        CameraOptions options)
     {
         MediaFactory.MFTEnumEx(
             TransformCategoryGuids.VideoProcessor,
@@ -163,6 +174,15 @@ public static class Camera
                 0,
                 outputType,
                 0);
+            using var control = transform.QueryInterface<IMFVideoProcessorControl>();
+            // ReSharper disable BitwiseOperatorOnEnumWithoutFlags
+            var mirror = VideoProcessorMirror.MirrorNone;
+            if (options.FlipX)
+                mirror |= VideoProcessorMirror.MirrorHorizontal;
+            if (options.FlipY)
+                mirror |= VideoProcessorMirror.MirrorVertical;
+            // ReSharper restore BitwiseOperatorOnEnumWithoutFlags
+            control.SetMirror(mirror);
             return transform;
         }
         finally

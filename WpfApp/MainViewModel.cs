@@ -12,7 +12,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MainViewModel()
     {
         Camera
-            .GetFrames(0)
+            .GetFrames(new CameraOptions
+            {
+                DeviceIndex = 0,
+                FlipX = true
+            })
             .Select(x => (FrameAvailableEvent?)x)
             .Materialize()
             .SelectMany(notification => notification.Kind == NotificationKind.OnNext
