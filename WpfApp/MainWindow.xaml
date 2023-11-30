@@ -10,7 +10,7 @@
     <Border
         Background="Red">
         <Image
-            Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 50}}"
+            Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 200}}"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"/>
     </Border>

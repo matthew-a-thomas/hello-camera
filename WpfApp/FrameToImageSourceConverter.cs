@@ -32,6 +32,14 @@ public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtens
         {
             var pixelWidth = stride / 4;
             var pixelHeight = frameAvailableEvent.Memory.Length / stride;
+            if (pixelWidth == 0 || pixelHeight == 0)
+            {
+                _cache = null;
+                _medianShader?.Dispose();
+                _medianShader = null;
+                return DependencyProperty.UnsetValue;
+            }
+
             _cache = cache = (
                 frameAvailableEvent.Memory.Length,
                 stride,
