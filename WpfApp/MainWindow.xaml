@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:WpfApp"
         mc:Ignorable="d"
         Title="{Binding Fps, Mode=OneWay}" Height="450" Width="800"
+        WindowState="Maximized"
         d:DataContext="{d:DesignInstance local:MainViewModel}">
     <Border
         Background="Red">
