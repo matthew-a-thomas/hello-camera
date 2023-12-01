@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Buffers;
+using System.Runtime.InteropServices;
 using ComputeSharp;
 
 namespace WpfApp;
@@ -7,7 +8,7 @@ namespace WpfApp;
 [GeneratedComputeShaderDescriptor]
 public readonly partial struct MedianShaderPass(
     ReadWriteTexture3D<Rgba32, Float4> layers,
-    ReadWriteTexture2D<Rgba32, Float4> median,
+    ReadWriteTexture2D<Rgba64, Float4> median,
     int numLayers) : IComputeShader
 {
     public void Execute()
@@ -27,6 +28,19 @@ public readonly partial struct MedianShaderPass(
     }
 }
 
+[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[GeneratedComputeShaderDescriptor]
+public readonly partial struct BrightenShader(
+    ReadWriteTexture2D<Rgba64, Float4> textureIn,
+    ReadWriteTexture2D<Rgba32, Float4> textureOut,
+    float multiplicationFactor) : IComputeShader
+{
+    public void Execute()
+    {
+        textureOut[ThreadIds.XY] = textureIn[ThreadIds.XY] * multiplicationFactor;
+    }
+}
+
 public sealed class MedianShader(
     int maxNumLayers,
     int pixelWidth,
@@ -34,12 +48,18 @@ public sealed class MedianShader(
 {
     GraphicsDevice? _graphicsDevice;
     ReadWriteTexture3D<Rgba32, Float4>? _layers;
-    ReadWriteTexture2D<Rgba32, Float4>? _median;
+    ReadWriteTexture2D<Rgba64, Float4>? _median;
+    IMemoryOwner<Rgba64>? _medianLocalCopy;
+    ReadWriteTexture2D<Rgba32, Float4>? _brightened;
     int _numLayers;
 
     public void Dispose()
     {
         _numLayers = 0;
+        Interlocked.Exchange(ref _layers, null)?.Dispose();
+        Interlocked.Exchange(ref _median, null)?.Dispose();
+        Interlocked.Exchange(ref _medianLocalCopy, null)?.Dispose();
+        Interlocked.Exchange(ref _brightened, null)?.Dispose();
         Interlocked.Exchange(ref _graphicsDevice, null)?.Dispose();
     }
 
@@ -52,7 +72,12 @@ public sealed class MedianShader(
             throw new InvalidOperationException("The layer and/or the median have the wrong number of bytes");
         var graphicsDevice = _graphicsDevice ??= GraphicsDevice.GetDefault();
         var layers = _layers ??= graphicsDevice.AllocateReadWriteTexture3D<Rgba32, Float4>(pixelWidth, pixelHeight, maxNumLayers);
-        var median = _median ??= graphicsDevice.AllocateReadWriteTexture2D<Rgba32, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
+        var median = _median ??= graphicsDevice.AllocateReadWriteTexture2D<Rgba64, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
+        var medianLocalCopy = _medianLocalCopy ??= MemoryPool<Rgba64>.Shared.Rent(pixelWidth * pixelHeight);
+        var medianLocalSpan = medianLocalCopy.Memory.Span[..(pixelWidth * pixelHeight)];
+        var brightened = _brightened ??= graphicsDevice.AllocateReadWriteTexture2D<Rgba32, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
+
+        // Copy the latest frame into the stack of layers
         var layerIndex = _numLayers++ % maxNumLayers;
         layers.CopyFrom(
             MemoryMarshal.Cast<byte, Rgba32>(layerIn),
@@ -62,10 +87,38 @@ public sealed class MedianShader(
             pixelWidth,
             pixelHeight,
             1);
+
+        // Compute the median of the stack of layers
         graphicsDevice.For(
             pixelWidth,
             pixelHeight,
             new MedianShaderPass(layers, median, Math.Min(maxNumLayers, _numLayers)));
-        median.CopyTo(MemoryMarshal.Cast<byte, Rgba32>(medianOut));
+
+        // Calculate brightness multiplication factor
+        median.CopyTo(medianLocalSpan);
+        ushort brightestChannel = 0;
+        foreach (var pixel in medianLocalSpan)
+        {
+            brightestChannel = Math.Max(
+                Math.Max(
+                    brightestChannel,
+                    pixel.R
+                ),
+                Math.Max(
+                    pixel.G,
+                    pixel.B
+                )
+            );
+        }
+        var multiplicationFactor = ushort.MaxValue / (float)brightestChannel;
+
+        // Brighten the output image
+        graphicsDevice.For(
+            pixelWidth,
+            pixelHeight,
+            new BrightenShader(median, brightened, multiplicationFactor));
+
+        // Copy to output
+        brightened.CopyTo(MemoryMarshal.Cast<byte, Rgba32>(medianOut));
     }
 }

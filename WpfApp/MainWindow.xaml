@@ -9,9 +9,9 @@
         WindowState="Maximized"
         d:DataContext="{d:DesignInstance local:MainViewModel}">
     <Border
-        Background="Red">
+        Background="Black">
         <Image
-            Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 3}}"
+            Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 10}}"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"/>
     </Border>
