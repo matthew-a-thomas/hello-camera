@@ -12,7 +12,7 @@ namespace WpfApp;
 public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtension, IValueConverter
 {
     (int BufferLength, int Stride, WriteableBitmap WriteableBitmap)? _cache;
-    MedianShader? _medianShader;
+    MedianShaderPass? _medianShader;
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 
@@ -53,7 +53,7 @@ public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtens
                 )
             );
             _medianShader?.Dispose();
-            _medianShader = medianShader = new MedianShader(medianFactor, pixelWidth, pixelHeight);
+            _medianShader = medianShader = new MedianShaderPass(medianFactor, pixelWidth, pixelHeight);
         }
         var writeableBitmap = cache.WriteableBitmap;
         writeableBitmap.Lock();
@@ -71,15 +71,6 @@ public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtens
                 );
                 var dirtyRect = new Int32Rect(0, 0, writeableBitmap.PixelWidth, writeableBitmap.PixelHeight);
                 writeableBitmap.AddDirtyRect(dirtyRect);
-                // fixed (byte* pointer = frameAvailableEvent.Memory.Span)
-                // {
-                //     writeableBitmap.WritePixels(
-                //         dirtyRect,
-                //         (IntPtr)pointer,
-                //         frameAvailableEvent.Memory.Length,
-                //         stride
-                //     );
-                // }
             }
         }
         finally

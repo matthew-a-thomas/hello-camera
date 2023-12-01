@@ -46,6 +46,14 @@ public sealed class ImfActivateCollection2<T> : IDisposable
 
 public static class ImfHelpers
 {
+    public static readonly IReadOnlyDictionary<Guid, string> CaptureDeviceAttributeNames = typeof(CaptureDeviceAttributeKeys)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Where(field => field.IsInitOnly && field.FieldType == typeof(Guid))
+        .ToDictionary(
+            field => (Guid)field.GetValue(null)!,
+            field => field.Name
+        );
+
     public static readonly IReadOnlyDictionary<Guid, string> VideoSubtypeNames = typeof(VideoFormatGuids)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Where(field => field.IsInitOnly && field.FieldType == typeof(Guid))

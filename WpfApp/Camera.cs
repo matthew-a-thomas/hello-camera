@@ -1,17 +1,7 @@
-﻿using System.Diagnostics;
-using System.Reactive.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
+﻿using System.Reactive.Linq;
 using Vortice.MediaFoundation;
 
 namespace WpfApp;
-
-public struct CameraOptions
-{
-    public int DeviceIndex;
-    public bool FlipX;
-    public bool FlipY;
-}
 
 public static class Camera
 {
@@ -128,16 +118,16 @@ public static class Camera
 
     static void PrintInfo(IMFMediaType videoMediaType)
     {
-        const string category = nameof(Camera) + "." + nameof(PrintInfo);
+        Console.WriteLine("Chose this video media type:");
         if (videoMediaType.MajorType == MediaTypeGuids.Video)
         {
             var subtype = videoMediaType.Get<Guid>(MediaTypeAttributeKeys.Subtype);
             var subtypeName = ImfHelpers.VideoSubtypeNames.GetValueOrDefault(subtype) ?? subtype.ToString();
-            Trace.WriteLine($"Video subtype: {subtypeName}", category);
+            Console.WriteLine($"\tVideo subtype: {subtypeName}");
         }
         foreach (var (key, value) in GetAllAttributes(videoMediaType))
         {
-            Trace.WriteLine($"{key}: {value}", category);
+            Console.WriteLine($"\t{key}: {value}");
         }
     }
 
@@ -146,7 +136,9 @@ public static class Camera
         var values = new Dictionary<string, object>();
         foreach (var (key, value) in attributes.GetAllAttributes())
         {
-            var name = ImfHelpers.MediaTypeAttributeNames.GetValueOrDefault(key) ?? key.ToString();
+            var name = ImfHelpers.MediaTypeAttributeNames.GetValueOrDefault(key)
+                       ?? ImfHelpers.CaptureDeviceAttributeNames.GetValueOrDefault(key)
+                       ?? key.ToString();
             values[name] = value;
             if (value is ulong joinedUlong)
             {
@@ -181,6 +173,7 @@ public static class Camera
                 from _ in new TransformsToSubtype(toVideoSubtype).Get(tuple.Attributes).Take(1) // Any supported transforms?
                 from frameRate in FrameRate.Get(tuple.Attributes)
                 from frameSize in FrameSize.Get(tuple.Attributes)
+                where frameSize.Width <= 2048 && frameSize.Height <= 2048
                 // from sampleSize in SampleSize.Get(tuple.Attributes)
                 // from bitrate in Bitrate.Get(tuple.Attributes)
                 orderby
@@ -249,110 +242,5 @@ public static class Camera
             mirror |= VideoProcessorMirror.MirrorVertical;
         // ReSharper restore BitwiseOperatorOnEnumWithoutFlags
         control.SetMirror(mirror);
-    }
-}
-
-public static class ImfAttributesExtensions
-{
-    public static IEnumerable<(Guid Key, object Value)> GetAllAttributes(this IMFAttributes attributes)
-    {
-        attributes.LockStore();
-        try
-        {
-            for (var i = 0U; i < attributes.Count; i++)
-            {
-                var value = attributes.GetByIndex(i, out var key);
-                yield return (key, value);
-            }
-        }
-        finally
-        {
-            attributes.UnlockStore();
-        }
-    }
-}
-
-public interface IStaticAttributeFilter<out TValue>
-{
-    public static abstract IEnumerable<TValue> Get(IReadOnlyDictionary<Guid, object> attributes);
-}
-
-public interface IAttributeFilter<out TValue>
-{
-    IEnumerable<TValue> Get(IReadOnlyDictionary<Guid, object> attributes);
-}
-
-public sealed class CommonVideoSubtypeName : IStaticAttributeFilter<string>
-{
-    public static IEnumerable<string> Get(IReadOnlyDictionary<Guid, object> attributes)
-    {
-        if (!attributes.TryGetValue(MediaTypeAttributeKeys.Subtype, out var rawSubtype) || rawSubtype is not Guid subtype)
-            yield break;
-        if (ImfHelpers.VideoSubtypeNames.TryGetValue(subtype, out var name))
-            yield return name;
-    }
-}
-
-public sealed class FrameRate : IStaticAttributeFilter<double>
-{
-    public static IEnumerable<double> Get(IReadOnlyDictionary<Guid, object> attributes)
-    {
-        if (!attributes.TryGetValue(MediaTypeAttributeKeys.FrameRate, out var framerateRaw) || framerateRaw is not long framerateLong)
-        {
-            yield return 0;
-        }
-        else
-        {
-            var (numerator, denominator) = ImfHelpers.Tear((ulong)framerateLong);
-            yield return (double)numerator / denominator;
-        }
-    }
-}
-
-public sealed class FrameSize : IStaticAttributeFilter<(uint Width, uint Height)>
-{
-    public static IEnumerable<(uint Width, uint Height)> Get(IReadOnlyDictionary<Guid, object> attributes)
-    {
-        if (!attributes.TryGetValue(MediaTypeAttributeKeys.FrameSize, out var frameSizeRaw) || frameSizeRaw is not long frameSizeLong)
-            yield return default;
-        else
-            yield return ImfHelpers.Tear((ulong)frameSizeLong);
-    }
-}
-
-public sealed class Bitrate : IStaticAttributeFilter<uint>
-{
-    public static IEnumerable<uint> Get(IReadOnlyDictionary<Guid, object> attributes)
-    {
-        if (!attributes.TryGetValue(MediaTypeAttributeKeys.AvgBitrate, out var bitrateRaw) || bitrateRaw is not int bitrateInt)
-            yield return default;
-        else
-            yield return (uint)bitrateInt;
-    }
-}
-
-public sealed class TransformsToSubtype(Guid subtype) : IAttributeFilter<Func<IMFTransform>>
-{
-    public IEnumerable<Func<IMFTransform>> Get(IReadOnlyDictionary<Guid, object> attributes)
-    {
-        if (!attributes.TryGetValue(MediaTypeAttributeKeys.Subtype, out var fromSubtypeRaw) || fromSubtypeRaw is not Guid fromSubtype)
-            yield break;
-        using var collection = ImfHelpers.GetTransforms(fromSubtype, subtype);
-        for (var i = 0; i < collection.Count; i++)
-        {
-            var capturedIndex = i;
-            yield return () => collection.Create(capturedIndex);
-        }
-    }
-}
-
-public sealed class SampleSize : IStaticAttributeFilter<uint>
-{
-    public static IEnumerable<uint> Get(IReadOnlyDictionary<Guid, object> attributes)
-    {
-        if (!attributes.TryGetValue(MediaTypeAttributeKeys.SampleSize, out var sampleSizeRaw) || sampleSizeRaw is not int sampleSizeInt)
-            yield return default;
-        else
-            yield return (uint)sampleSizeInt;
     }
 }
