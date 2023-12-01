@@ -97,8 +97,16 @@ public sealed class MedianShader(
         // Calculate brightness multiplication factor
         median.CopyTo(medianLocalSpan);
         ushort brightestChannel = 0;
-        foreach (var pixel in medianLocalSpan)
+        var center = new System.Numerics.Vector2((float)pixelWidth / 2, (float)pixelHeight / 2);
+        var maxDistanceFromCenter = Math.Min(pixelWidth, pixelHeight) * 1.0f / 8.0f;
+        for (var pixelIndex = 0; pixelIndex < medianLocalSpan.Length; pixelIndex++)
         {
+            var pixel = medianLocalSpan[pixelIndex];
+            var x = pixelIndex % pixelWidth;
+            var y = pixelIndex / pixelWidth;
+            var pixelLocation = new System.Numerics.Vector2(x, y);
+            if ((pixelLocation - center).Length() > maxDistanceFromCenter)
+                continue;
             brightestChannel = Math.Max(
                 Math.Max(
                     brightestChannel,
@@ -110,6 +118,7 @@ public sealed class MedianShader(
                 )
             );
         }
+
         var multiplicationFactor = ushort.MaxValue / (float)brightestChannel;
 
         // Brighten the output image
