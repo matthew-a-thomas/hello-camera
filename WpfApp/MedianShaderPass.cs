@@ -10,7 +10,7 @@ public sealed class MedianShaderPass(
     int pixelHeight) : IDisposable
 {
     GraphicsDevice? _graphicsDevice;
-    ReadWriteTexture3D<Rgba32, Float4>? _layers;
+    ReadWriteBuffer<uint>? _layers;
     ReadWriteTexture2D<Rgba64, Float4>? _median;
     IMemoryOwner<Rgba64>? _medianLocalCopy;
     ReadWriteTexture2D<Rgba32, Float4>? _brightened;
@@ -30,26 +30,23 @@ public sealed class MedianShaderPass(
         ReadOnlySpan<byte> layerIn,
         Span<byte> medianOut)
     {
-        var numBytes = pixelWidth * pixelHeight * 4;
-        if (layerIn.Length != numBytes || medianOut.Length != numBytes)
+        var numPixelsInLayer = pixelWidth * pixelHeight;
+        var numBytesInLayer = numPixelsInLayer * 4;
+        if (layerIn.Length != numBytesInLayer || medianOut.Length != numBytesInLayer)
             throw new InvalidOperationException("The layer and/or the median have the wrong number of bytes");
         var graphicsDevice = _graphicsDevice ??= GraphicsDevice.GetDefault();
-        var layers = _layers ??= graphicsDevice.AllocateReadWriteTexture3D<Rgba32, Float4>(pixelWidth, pixelHeight, maxNumLayers);
+        var layers = _layers ??= graphicsDevice.AllocateReadWriteBuffer<uint>(numPixelsInLayer * maxNumLayers);
         var median = _median ??= graphicsDevice.AllocateReadWriteTexture2D<Rgba64, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
-        var medianLocalCopy = _medianLocalCopy ??= MemoryPool<Rgba64>.Shared.Rent(pixelWidth * pixelHeight);
-        var medianLocalSpan = medianLocalCopy.Memory.Span[..(pixelWidth * pixelHeight)];
+        var medianLocalCopy = _medianLocalCopy ??= MemoryPool<Rgba64>.Shared.Rent(numPixelsInLayer);
+        var medianLocalSpan = medianLocalCopy.Memory.Span[..numPixelsInLayer];
         var brightened = _brightened ??= graphicsDevice.AllocateReadWriteTexture2D<Rgba32, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
 
         // Copy the latest frame into the stack of layers
         var layerIndex = _numLayers++ % maxNumLayers;
         layers.CopyFrom(
-            MemoryMarshal.Cast<byte, Rgba32>(layerIn),
-            0,
-            0,
-            layerIndex,
-            pixelWidth,
-            pixelHeight,
-            1);
+            MemoryMarshal.Cast<byte, uint>(layerIn),
+            layerIndex * numPixelsInLayer
+        );
 
         // Compute the median of the stack of layers
         graphicsDevice.For(

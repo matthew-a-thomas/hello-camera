@@ -171,12 +171,14 @@ public static class Camera
             var preferred =
                 from tuple in annotatedMediaTypes
                 from _ in new TransformsToSubtype(toVideoSubtype).Get(tuple.Attributes).Take(1) // Any supported transforms?
+                from decoded in SourceTypeDecoded.Get(tuple.Attributes)
                 from frameRate in FrameRate.Get(tuple.Attributes)
                 from frameSize in FrameSize.Get(tuple.Attributes)
-                where frameSize.Width <= 2048 && frameSize.Height <= 2048
+                // where frameSize.Width <= 2048 && frameSize.Height <= 2048
                 // from sampleSize in SampleSize.Get(tuple.Attributes)
                 // from bitrate in Bitrate.Get(tuple.Attributes)
                 orderby
+                    decoded,
                     frameSize descending,
                     // bitrate descending,
                     frameRate descending
