@@ -178,10 +178,10 @@ public static class Camera
                 // from sampleSize in SampleSize.Get(tuple.Attributes)
                 // from bitrate in Bitrate.Get(tuple.Attributes)
                 orderby
-                    decoded,
                     frameSize descending,
                     // bitrate descending,
-                    frameRate descending
+                    frameRate descending,
+                    decoded
                 select tuple;
             if (preferred.FirstOrNull() is not var (mediaType, mediaTypeIndex, _))
                 return null;
