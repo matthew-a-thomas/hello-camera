@@ -8,7 +8,7 @@ using System.Windows.Media.Imaging;
 namespace WpfApp;
 
 [MarkupExtensionReturnType(typeof(FrameToImageSourceConverter))]
-[ValueConversion(typeof(FrameAvailableEvent), typeof(ImageSource))]
+[ValueConversion(typeof(FrameAvailableEvent), typeof(WriteableBitmap))]
 public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtension, IValueConverter
 {
     (int BufferLength, int Stride, WriteableBitmap WriteableBitmap)? _cache;

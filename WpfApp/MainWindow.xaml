@@ -11,7 +11,8 @@
     <Border
         Background="Black">
         <Image
-            Source="{Binding Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 30}}"
+            x:Name="Image"
+            Source="{Binding Path=Frame, Mode=OneWay, Converter={local:FrameToImageSourceConverter 30}}"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"/>
     </Border>
