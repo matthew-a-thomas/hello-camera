@@ -9,10 +9,10 @@ namespace WpfApp;
 
 [MarkupExtensionReturnType(typeof(FrameToImageSourceConverter))]
 [ValueConversion(typeof(FrameAvailableEvent), typeof(WriteableBitmap))]
-public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtension, IValueConverter
+public sealed class FrameToImageSourceConverter(int numLayers) : MarkupExtension, IValueConverter
 {
     (int BufferLength, int Stride, WriteableBitmap WriteableBitmap)? _cache;
-    MedianShaderPass? _medianShader;
+    ShaderPass? _shaderPass;
 
     public override object ProvideValue(IServiceProvider serviceProvider) => this;
 
@@ -21,22 +21,22 @@ public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtens
         if (value is not FrameAvailableEvent frameAvailableEvent)
         {
             _cache = null;
-            _medianShader?.Dispose();
-            _medianShader = null;
+            _shaderPass?.Dispose();
+            _shaderPass = null;
             return DependencyProperty.UnsetValue;
         }
         using var _ = frameAvailableEvent;
         frameAvailableEvent.Increment();
         var stride = frameAvailableEvent.Stride;
-        if (_cache is not {} cache || _medianShader is not {} medianShader || cache.BufferLength != frameAvailableEvent.Memory.Length || cache.Stride != stride)
+        if (_cache is not {} cache || _shaderPass is not {} shaderPass || cache.BufferLength != frameAvailableEvent.Memory.Length || cache.Stride != stride)
         {
             var pixelWidth = stride / 4;
             var pixelHeight = frameAvailableEvent.Memory.Length / stride;
             if (pixelWidth == 0 || pixelHeight == 0)
             {
                 _cache = null;
-                _medianShader?.Dispose();
-                _medianShader = null;
+                _shaderPass?.Dispose();
+                _shaderPass = null;
                 return DependencyProperty.UnsetValue;
             }
 
@@ -52,8 +52,8 @@ public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtens
                     null
                 )
             );
-            _medianShader?.Dispose();
-            _medianShader = medianShader = new MedianShaderPass(medianFactor, pixelWidth, pixelHeight);
+            _shaderPass?.Dispose();
+            _shaderPass = shaderPass = new ShaderPass(numLayers, pixelWidth, pixelHeight);
         }
         var writeableBitmap = cache.WriteableBitmap;
         writeableBitmap.Lock();
@@ -65,7 +65,7 @@ public sealed class FrameToImageSourceConverter(int medianFactor) : MarkupExtens
                     (void*)writeableBitmap.BackBuffer,
                     writeableBitmap.BackBufferStride * writeableBitmap.PixelHeight
                 );
-                medianShader.Incorporate(
+                shaderPass.Incorporate(
                     frameAvailableEvent.Memory.Span,
                     backBuffer
                 );
