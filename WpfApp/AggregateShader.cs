@@ -7,6 +7,7 @@ namespace WpfApp;
 public readonly partial struct AggregateShader(
     ReadWriteBuffer<uint> layers,
     ReadWriteTexture2D<Rgba64, Float4> aggregate,
+    ReadWriteTexture2D<Rgba32, Float4> output,
     int numLayers) : IComputeShader
 {
     public void Execute()
@@ -31,5 +32,6 @@ public readonly partial struct AggregateShader(
         }
         var newMedianPixel = numerator / denominator;
         aggregate[ThreadIds.XY] = newMedianPixel;
+        output[ThreadIds.XY] = Hlsl.Pow(newMedianPixel, 0.5f);
     }
 }

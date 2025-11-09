@@ -11,7 +11,7 @@ public sealed class ShaderPass(
     GraphicsDevice? _graphicsDevice;
     ReadWriteBuffer<uint>? _layers;
     ReadWriteTexture2D<Rgba64, Float4>? _aggregate;
-    ReadWriteTexture2D<Rgba32, Float4>? _brightened;
+    ReadWriteTexture2D<Rgba32, Float4>? _output;
     int _numLayers;
 
     public void Dispose()
@@ -19,7 +19,7 @@ public sealed class ShaderPass(
         _numLayers = 0;
         Interlocked.Exchange(ref _layers, null)?.Dispose();
         Interlocked.Exchange(ref _aggregate, null)?.Dispose();
-        Interlocked.Exchange(ref _brightened, null)?.Dispose();
+        Interlocked.Exchange(ref _output, null)?.Dispose();
         Interlocked.Exchange(ref _graphicsDevice, null)?.Dispose();
     }
 
@@ -35,7 +35,7 @@ public sealed class ShaderPass(
         var layers = _layers ??= graphicsDevice.AllocateReadWriteBuffer<uint>(numPixelsInLayer * maxNumLayers);
         var aggregate = _aggregate ??=
             graphicsDevice.AllocateReadWriteTexture2D<Rgba64, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
-        var brightened = _brightened ??=
+        var outputTexture = _output ??=
             graphicsDevice.AllocateReadWriteTexture2D<Rgba32, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
 
         // Copy the latest frame into the stack of layers
@@ -49,15 +49,9 @@ public sealed class ShaderPass(
         graphicsDevice.For(
             pixelWidth,
             pixelHeight,
-            new AggregateShader(layers, aggregate, Math.Min(maxNumLayers, _numLayers)));
-
-        // Brighten the output image
-        graphicsDevice.For(
-            pixelWidth,
-            pixelHeight,
-            new BrightenShader(aggregate, brightened));
+            new AggregateShader(layers, aggregate, outputTexture, Math.Min(maxNumLayers, _numLayers)));
 
         // Copy to output
-        brightened.CopyTo(MemoryMarshal.Cast<byte, Rgba32>(output));
+        outputTexture.CopyTo(MemoryMarshal.Cast<byte, Rgba32>(output));
     }
 }
