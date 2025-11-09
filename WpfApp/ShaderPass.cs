@@ -9,7 +9,7 @@ public sealed class ShaderPass(
     int pixelHeight) : IDisposable
 {
     GraphicsDevice? _graphicsDevice;
-    ReadWriteBuffer<uint>? _layers;
+    ReadWriteTexture3D<Rgba32, Float4>? _layers;
     ReadWriteTexture2D<Rgba64, Float4>? _aggregate;
     ReadWriteTexture2D<Rgba32, Float4>? _output;
     int _numLayers;
@@ -32,7 +32,7 @@ public sealed class ShaderPass(
         if (layerIn.Length != numBytesInLayer || output.Length != numBytesInLayer)
             throw new InvalidOperationException("The layer and/or the output have the wrong number of bytes");
         var graphicsDevice = _graphicsDevice ??= GraphicsDevice.GetDefault();
-        var layers = _layers ??= graphicsDevice.AllocateReadWriteBuffer<uint>(numPixelsInLayer * maxNumLayers);
+        var layers = _layers ??= graphicsDevice.AllocateReadWriteTexture3D<Rgba32, Float4>(pixelWidth, pixelHeight, maxNumLayers, AllocationMode.Clear);
         var aggregate = _aggregate ??=
             graphicsDevice.AllocateReadWriteTexture2D<Rgba64, Float4>(pixelWidth, pixelHeight, AllocationMode.Clear);
         var outputTexture = _output ??=
@@ -41,8 +41,10 @@ public sealed class ShaderPass(
         // Copy the latest frame into the stack of layers
         var layerIndex = _numLayers++ % maxNumLayers;
         layers.CopyFrom(
-            MemoryMarshal.Cast<byte, uint>(layerIn),
-            layerIndex * numPixelsInLayer
+            MemoryMarshal.Cast<byte, Rgba32>(layerIn),
+            ..,
+            ..,
+            layerIndex..(layerIndex + 1)
         );
 
         // Aggregate layers
