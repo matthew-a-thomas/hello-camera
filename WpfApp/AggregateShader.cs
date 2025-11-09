@@ -11,9 +11,11 @@ public readonly partial struct AggregateShader(
 {
     public void Execute()
     {
+        var oldMedianPixel = aggregate[ThreadIds.XY];
         var layerOffset = ThreadIds.Y * aggregate.Width + ThreadIds.X;
         var layerSize = aggregate.Width * aggregate.Height;
-        var sum = new Float4();
+        var numerator = new Float4();
+        var denominator = 0.0f;
         for (var z = 0; z < numLayers; z++)
         {
             var pixelRgb = layers[layerOffset + z * layerSize];
@@ -23,8 +25,11 @@ public readonly partial struct AggregateShader(
                 (pixelRgb >> 16) & 0xff,
                 (pixelRgb >> 24) & 0xff
             ) / 255.0f;
-            sum += pixel;
+            var distance = Hlsl.Max(0.001f, Hlsl.Distance(pixel, oldMedianPixel));
+            numerator += pixel / distance;
+            denominator += 1.0f / distance;
         }
-        aggregate[ThreadIds.XY] = sum / numLayers;
+        var newMedianPixel = numerator / denominator;
+        aggregate[ThreadIds.XY] = newMedianPixel;
     }
 }
