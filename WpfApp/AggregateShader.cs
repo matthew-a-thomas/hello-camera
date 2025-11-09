@@ -4,7 +4,7 @@ namespace WpfApp;
 
 [ThreadGroupSize(DefaultThreadGroupSizes.XY)]
 [GeneratedComputeShaderDescriptor]
-public readonly partial struct AverageShader(
+public readonly partial struct AggregateShader(
     ReadWriteBuffer<uint> layers,
     ReadWriteTexture2D<Rgba64, Float4> aggregate,
     int numLayers) : IComputeShader

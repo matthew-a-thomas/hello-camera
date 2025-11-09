@@ -49,7 +49,7 @@ public sealed class ShaderPass(
         graphicsDevice.For(
             pixelWidth,
             pixelHeight,
-            new AverageShader(layers, aggregate, Math.Min(maxNumLayers, _numLayers)));
+            new AggregateShader(layers, aggregate, Math.Min(maxNumLayers, _numLayers)));
 
         // Brighten the output image
         graphicsDevice.For(
