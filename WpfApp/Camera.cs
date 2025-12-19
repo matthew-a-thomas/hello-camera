@@ -174,11 +174,12 @@ public static class Camera
                 from decoded in SourceTypeDecoded.Get(tuple.Attributes)
                 from frameRate in FrameRate.Get(tuple.Attributes)
                 from frameSize in FrameSize.Get(tuple.Attributes)
-                // where frameSize.Width <= 2048 && frameSize.Height <= 2048
-                // from sampleSize in SampleSize.Get(tuple.Attributes)
+                where frameSize is { Width: <= 2048, Height: <= 2048 }
+                from sampleSize in SampleSize.Get(tuple.Attributes)
                 // from bitrate in Bitrate.Get(tuple.Attributes)
                 orderby
-                    frameSize descending,
+                    sampleSize descending,
+                    // frameSize descending,
                     // bitrate descending,
                     frameRate descending,
                     decoded
