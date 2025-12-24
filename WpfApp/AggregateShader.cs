@@ -25,6 +25,6 @@ public readonly partial struct AggregateShader(
         }
         var newMedianPixel = numerator / denominator;
         aggregate[ThreadIds.XY] = newMedianPixel;
-        output[ThreadIds.XY] = Hlsl.Pow(newMedianPixel, 2f);
+        output[ThreadIds.XY] = Hlsl.Pow(newMedianPixel, 0.4f);
     }
 }
